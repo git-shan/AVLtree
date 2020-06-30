@@ -1,12 +1,18 @@
 import java.util.LinkedList;
 import java.util.Queue;
 
-public class AVLtree<K extends Comparable<K>, V > {
+public class RBtree<K extends Comparable<K>, V > {
+    private enum COLORS {
+        RED ,
+        BLK
+        }
+
     private class Node{
         public K k;
         public V v;
-        public int size,depth,count,height;
+        public int size,count;
         public Node left,right;
+        public COLORS color;
 
         public Node(K k, V v){
             this();
@@ -18,10 +24,9 @@ public class AVLtree<K extends Comparable<K>, V > {
             this.v = null;
             left = null;
             right = null;
-            size = 0;  // size of tree, using this node as root
-            depth = 0; // depth in the whole tree
+            size = 1;  // size of tree, using this node as root
             count = 0; // value = e
-            height = 1;
+            color = COLORS.RED;
         }
         public void copyValue(Node src){
             k = src.k;
@@ -31,7 +36,7 @@ public class AVLtree<K extends Comparable<K>, V > {
         @Override
         public String toString(){
             StringBuilder res = new StringBuilder();
-            res.append("("+ k+":"+v+","+height+";"+count+","+size+","+depth+")");
+            res.append("("+ k+":"+v+","+color+";"+count+","+size+")");
             return res.toString();
         }
     }
@@ -48,17 +53,11 @@ public class AVLtree<K extends Comparable<K>, V > {
         LEVL, // leveled order
         TREE  // human readable tree
     }
-    private int getBalanceFactor(Node node){
+    private COLORS getColor(Node node){
         if(node==null)
-            return 0;
+            return COLORS.BLK;
         else
-            return getHeight(node.left) - getHeight(node.right);
-    }
-    private int getHeight(Node node){
-        if(node==null)
-            return 0;
-        else
-            return node.height;
+            return node.color;
     }
     public Boolean isBst(){
        return isBst(root);
@@ -71,19 +70,6 @@ public class AVLtree<K extends Comparable<K>, V > {
                 return false;
         }
         return true;
-    }
-    public boolean isAVL(){
-        return isAVL(root);
-    }
-    private boolean isAVL(Node node){
-        if(node == null)
-            return true;
-
-        int balanceFactor = getBalanceFactor(node);
-        if(Math.abs(balanceFactor)>1)
-            return false;
-
-        return isAVL(node.left) && isAVL(node.right);
     }
     private void inOrder(Node node, Array keys){
         if(node==null)
@@ -116,16 +102,16 @@ public class AVLtree<K extends Comparable<K>, V > {
         }
     }
 
-    public AVLtree(traMode traverse, boolean allowCount){
+    public RBtree(traMode traverse, boolean allowCount){
         this();
         setAllowCount(allowCount); // override default config
         setTraverse(traverse);
     }
-    public AVLtree(boolean allowCount) {
+    public RBtree(boolean allowCount) {
         this();
         setAllowCount(allowCount); // override default config
     }
-    public AVLtree() { // leveled order
+    public RBtree() { // leveled order
         root = null;
         deleting = false;
         allowCount = true;
@@ -133,7 +119,7 @@ public class AVLtree<K extends Comparable<K>, V > {
     }
 
 
-    public AVLtree(K[] arrK, V[] arrV, boolean allowCount){
+    public RBtree(K[] arrK, V[] arrV, boolean allowCount){
         this(allowCount);
         for (int i=0;i< arrK.length;i++ ) {
             add(arrK[i],arrV[i]);
@@ -148,6 +134,14 @@ public class AVLtree<K extends Comparable<K>, V > {
     private boolean isEmpty(Node node){
         return (node.size ==0);
     }
+    private boolean isRed(Node node){
+        return getColor(node) == COLORS.RED;
+    }
+    private void flipColor(Node node){
+        node.color = COLORS.RED;
+        node.left.color = COLORS.BLK;
+        node.right.color = COLORS.BLK;
+    }
 //--------------------------------------------
 //       y
 //     x    t4                x
@@ -161,9 +155,9 @@ public class AVLtree<K extends Comparable<K>, V > {
         x.right = y;
         y.left = t3;
 
-//        update height and size;
-        y.height = Math.max(getHeight(y.left),getHeight(y.right)) + 1;
-        x.height = Math.max(getHeight(x.left),getHeight(x.right)) + 1;
+//        update color and size;
+        x.color = y.color;
+        y.color = COLORS.RED;
         y.size = 1  + size(y.left) + size(y.right) + y.count;
         x.size = 1  + size(x.left) + size(x.right) + x.count;
         return x;
@@ -181,55 +175,33 @@ public class AVLtree<K extends Comparable<K>, V > {
         x.left = y;
         y.right = t3;
 
-//        update height and size;
-        y.height = Math.max(getHeight(y.left),getHeight(y.right)) + 1;
-        x.height = Math.max(getHeight(x.left),getHeight(x.right)) + 1;
+//        update color and size;
+        x.color = y.color;
+        y.color = COLORS.RED;
         y.size = 1  + size(y.left) + size(y.right) + y.count;
         x.size = 1  + size(x.left) + size(x.right) + x.count;
         return x;
     }
-    private Node maintainAVL(Node node) {
-//        System.out.println("balance factor: " + balanceFactor);
-        if(node!=null){
-            node.height = 1 + Math.max(getHeight(node.left), getHeight(node.right));
-        }
-        int balanceFactor = getBalanceFactor(node);
-        if (Math.abs(balanceFactor) > 1) {
-            boolean lbf = (getBalanceFactor(node.left) >=0 );
-            boolean rbf = (getBalanceFactor(node.right) <=0 );
-//            System.out.println("Unbalanced node: " + balanceFactor);
+    private Node maintainRBT(Node node) {
+        if(node == null) return null;
+        if (!isRed(node.left) && isRed(node.right))
+            node = rotateLeft(node);
 
-            // LL
-            if (balanceFactor > 1 && lbf )
-                return rotateRight(node);
+        if (isRed(node.left) && isRed(node.left.left))
+            node = rotateRight(node);
 
-            // RR
-            if (balanceFactor < -1 && rbf)
-                return rotateLeft(node);
-
-            // LR
-            if (balanceFactor > 1 && !lbf) {
-                node.left = rotateLeft(node.left);
-                return rotateRight(node);
-            }
-
-            // RL
-            if (balanceFactor < -1 && !rbf) {
-                node.right = rotateRight(node.right);
-                return rotateLeft(node);
-            }
-        }
+        if (isRed(node.left) && isRed(node.right))
+            flipColor(node);
         return node;
     }
     public void add(K k, V v){
         root = add(root, k, v, 0);
+        root.color = COLORS.BLK;
     }
     private Node add(Node node, K k, V v, int depth){
 //        basic solution, 3 case of value e to stop traversing; consider null tree as a BST,LBST,RBST
         if(node == null){ //null then create
             Node newNode =  new Node(k,v);
-            newNode.depth = depth;
-            newNode.size++; // update size of new node
             return newNode;
         }
 //        recursively add
@@ -248,7 +220,7 @@ public class AVLtree<K extends Comparable<K>, V > {
         }else
             node.size = 1  + size(node.left) + size(node.right);
 //        update height of node
-        node = maintainAVL(node);
+        node = maintainRBT(node);
         return node; //not null, value equal, then return node itself
     }
 
@@ -495,13 +467,6 @@ public class AVLtree<K extends Comparable<K>, V > {
        bstStringArr.get(depth+1).append("};\t");
 // post position
     }
-    private void decDepth(Node node){
-       if(node == null)
-           return;
-       node.depth--;
-       decDepth(node.left);
-       decDepth(node.right);
-    }
 
     public void removeMin(){
         root = removeMin(root);
@@ -530,7 +495,6 @@ public class AVLtree<K extends Comparable<K>, V > {
                 return node;
             }
             else{
-                decDepth(node.right); //maintain depth when chain in right tree
                 return node.right;
             }
         }
@@ -539,7 +503,7 @@ public class AVLtree<K extends Comparable<K>, V > {
         node.left  = removeMin(node.left);
         if(node!=null) node.size--;   // the min value must be removed
         //        update height of node
-        node = maintainAVL(node);
+        node = maintainRBT(node);
         return node;
         }
 
@@ -570,7 +534,7 @@ public class AVLtree<K extends Comparable<K>, V > {
                 return node;
             }
             else {
-                decDepth(node.left); //maintain depth when chain in left tree
+                if(isRed(node.left)) node.left.color = COLORS.BLK;
                 return node.left;
             }
         }
@@ -580,7 +544,7 @@ public class AVLtree<K extends Comparable<K>, V > {
         if(node!=null) node.size--;   // the max value must be removed
 
         //        update height of node
-        node = maintainAVL(node);
+        node = maintainRBT(node);
         return node;
     }
     public void removeN(K k){ // remove with remove miN
@@ -608,7 +572,6 @@ public class AVLtree<K extends Comparable<K>, V > {
                 node.left = removeMax(node.left);
             }
             else if(node.right!=null) { //only had right child, use right child to replace this node
-                decDepth(node.right); //maintain depth when chain in right tree
                 node = node.right;
             }
             else {
@@ -617,7 +580,7 @@ public class AVLtree<K extends Comparable<K>, V > {
         }
         if (node != null && deleting) node.size--;
         //        update height of node
-        node = maintainAVL(node);
+        node = maintainRBT(node);
         return node;
     }
     private Node removeVn(Node node, K k){ // using min to remove val
@@ -638,7 +601,7 @@ public class AVLtree<K extends Comparable<K>, V > {
                 node.right = removeMin(node.right);
             }
             else if(node.left!=null) {// left child only , use left child to replace this node
-                decDepth(node.left); //maintain depth when chain in left tree
+                if(isRed(node.left)) node.left.color = COLORS.BLK;
                 node = node.left;
             }
             else {
@@ -648,7 +611,7 @@ public class AVLtree<K extends Comparable<K>, V > {
         // update size of node and its parent nodes
         if (node != null && deleting) node.size--;
         //        update height of node
-        node = maintainAVL(node);
+        node = maintainRBT(node);
         return node;
     }
     private String generateDepthString (int depth) {
@@ -660,7 +623,6 @@ public class AVLtree<K extends Comparable<K>, V > {
     }
     public void printDebug() {
         System.out.println("size="+root.size);
-        System.out.println( "isAVL: "+ this.isAVL());
         setTraverse(traMode.FMID);
         System.out.println(this);
         setTraverse(traMode.TREE);
@@ -668,7 +630,6 @@ public class AVLtree<K extends Comparable<K>, V > {
     }
     private void testRemoveMin(int count){
         for(int i=0; i<count; i++){
-            System.out.println( "isAVL: "+ this.isAVL());
             System.out.println("Remove min");
             removeMin();
             printDebug();
@@ -676,7 +637,6 @@ public class AVLtree<K extends Comparable<K>, V > {
     }
     private void testRemoveMax(int count){
         for(int i=0; i<count; i++){
-            System.out.println( "isAVL: "+ this.isAVL());
             System.out.println("Remove max");
             removeMax();
             printDebug();
@@ -684,28 +644,23 @@ public class AVLtree<K extends Comparable<K>, V > {
     }
     private void testRemoveXN(K k, V v) {
         System.out.println("Remove Value N: " + k);
-        System.out.println( "isAVL: "+ this.isAVL());
         this.removeN(k);
         this.printDebug();
         this.add(k,v);  // add back
         System.out.println("add " + k + " back, size=" + root.size);
-        System.out.println( "isAVL: "+ this.isAVL());
         System.out.println(this);
         System.out.println("Remove Value X: " + k);
-        System.out.println( "isAVL: "+ this.isAVL());
         this.removeX(k);
         this.printDebug();
         System.out.println("Remove Value N: " + k);
-        System.out.println( "isAVL: "+ this.isAVL());
         this.removeN(k);
         this.printDebug();
     }
 
     public static void main(String[] args){
         Integer [] data = {1,2,3,4,5,6,7,8,9,10, 11,12,13,35,34,33,32,31,30,29,28,14,15,16,17,18,27,26,25,24};
-        AVLtree<Integer, Integer> bst = new AVLtree<Integer,Integer>(data,data,true);
+        RBtree<Integer, Integer> bst = new RBtree<Integer,Integer>(data,data,true);
         System.out.println("size="+bst.getSize());
-        System.out.println( "isAVL: "+ bst.isAVL());
         for(traMode mode: traMode.values()) {
             bst.setTraverse(mode);
             System.out.println(bst);
@@ -728,9 +683,7 @@ public class AVLtree<K extends Comparable<K>, V > {
         System.out.println( "Selected #"+i+"="+ bst.select(i));
 
         bst.testRemoveMax(5);
-        System.out.println( "isAVL: "+ bst.isAVL());
         bst.testRemoveMin(5);
-        System.out.println( "isAVL: "+ bst.isAVL());
         System.out.println("min of bst: "+bst.min());
         System.out.println("max of bst: "+bst.max());
 
@@ -749,13 +702,14 @@ public class AVLtree<K extends Comparable<K>, V > {
         System.out.println(bst.rank(4));
         System.out.println(bst.floor(4));
 
+        for(int i=77; i<88; i++)
+            bst.add(i,i);
         bst.set(18,666);
         bst.set(17,777);
         System.out.println(bst);
         System.out.println( "sum of count = "+ bst.sumCount());
         System.out.println( "sizeNC = "+ bst.sizeNC());
         System.out.println( "isBST: "+ bst.isBst());
-        System.out.println( "isAVL: "+ bst.isAVL());
     }
 
 }
